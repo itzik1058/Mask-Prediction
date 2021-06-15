@@ -29,7 +29,7 @@ def intersection_over_union(bbox1, bbox2):
     return intersection / union
 
 
-def train(train_path: Path, test_path: Path, n_epoch=60, batch_size=64, lr=0.02):
+def train(train_path: Path, test_path: Path, n_epoch=60, batch_size=32, lr=0.02):
     mask_dataset = dataset.MaskDataset(train_path)
     test_dataset = dataset.MaskDataset(test_path)
     data_loader = data.DataLoader(mask_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate)
@@ -38,9 +38,9 @@ def train(train_path: Path, test_path: Path, n_epoch=60, batch_size=64, lr=0.02)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     l1_loss = torch.nn.L1Loss()
     bce_loss = torch.nn.BCELoss()
-    bbox_loss, mask_loss = [0], [0]
-    bbox_iou, mask_accuracy = [0], [0]
-    bbox_test_iou, mask_test_accuracy = [0], [0]
+    bbox_loss, mask_loss = [], []
+    bbox_iou, mask_accuracy = [], []
+    bbox_test_iou, mask_test_accuracy = [], []
     for epoch in range(n_epoch):
         epoch_start = time.time()
         bbox_epoch_loss, mask_epoch_loss = 0, 0
@@ -57,8 +57,7 @@ def train(train_path: Path, test_path: Path, n_epoch=60, batch_size=64, lr=0.02)
             bbox_epoch_loss += bbox_batch_loss.item() / len(data_loader)
             mask_epoch_loss += mask_batch_loss.item() / len(data_loader)
             bbox_epoch_iou += intersection_over_union(bbox, true_bbox).sum().item() / len(data_loader.dataset)
-            mask: torch.Tensor
-            mask_epoch_accuracy += ((mask > 0.5) == true_mask).float().sum().item() / len(data_loader.dataset)
+            mask_epoch_accuracy += mask.ge(0.5).eq(true_mask).float().sum().item() / len(data_loader.dataset)
         bbox_loss.append(bbox_epoch_loss)
         mask_loss.append(mask_epoch_loss)
         bbox_iou.append(bbox_epoch_iou)
@@ -73,11 +72,11 @@ def train(train_path: Path, test_path: Path, n_epoch=60, batch_size=64, lr=0.02)
                 bbox, mask = model(image)
                 bbox_epoch_iou += intersection_over_union(bbox, true_bbox).sum().item() / len(test_loader.dataset)
                 mask: torch.Tensor
-                mask_epoch_accuracy += ((mask > 0.5) == true_mask).float().sum().item() / len(test_loader.dataset)
+                mask_epoch_accuracy += mask.ge(0.5).eq(true_mask).float().sum().item() / len(test_loader.dataset)
             bbox_test_iou.append(bbox_epoch_iou)
             mask_test_accuracy.append(mask_epoch_accuracy)
         print(f'\tBounding Box IoU {bbox_epoch_iou:.3f}\tMask Accuracy {mask_epoch_accuracy:.3f}\t(Test)')
-    torch.save(model.state_dict(), 'mask_net.torch')
+    torch.save(model.state_dict(), 'masknet.torch')
     plots = [(bbox_loss, 'Bounding Box Loss'), (mask_loss, 'Mask Loss'),
              (bbox_iou, 'Bounding Box IoU'), (mask_accuracy, 'Mask Accuracy'),
              (bbox_test_iou, 'Bounding Box IoU (Test)'), (mask_test_accuracy, 'Mask Accuracy (Test)')]
