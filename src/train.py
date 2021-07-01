@@ -26,7 +26,7 @@ def intersection_over_union(bbox1, bbox2):
     overlap = torch.clamp(max_b - min_b, min=0)
     intersection = overlap[:, 0] * overlap[:, 1]
     union = area1 + area2 - intersection
-    return intersection / union
+    return intersection.float() / union.float()
 
 
 def train(train_path: Path, test_path: Path, n_epoch=60, batch_size=32, lr=0.02):
